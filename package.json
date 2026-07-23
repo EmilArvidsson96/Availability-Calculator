@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "hash-password": "node scripts/hash-password.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.3.5",

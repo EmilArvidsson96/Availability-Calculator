@@ -27,6 +27,9 @@ jobs:
       - run: npm ci
       - run: npm run test
       - run: npm run build
+        env:
+          VITE_AUTH_USERNAME: ${{ secrets.AUTH_USERNAME }}
+          VITE_AUTH_PASSWORD_HASH: ${{ secrets.AUTH_PASSWORD_HASH }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
