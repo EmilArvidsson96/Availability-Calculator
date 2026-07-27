@@ -3,10 +3,12 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   addEdge as rfAddEdge,
+  reconnectEdge,
   type Connection,
   type Edge,
   type OnNodesChange,
   type OnEdgesChange,
+  type OnReconnect,
   type XYPosition,
 } from '@xyflow/react';
 import {
@@ -19,7 +21,7 @@ import {
 } from '../types/model';
 import { instantiateAny } from './useCatalogStore';
 import { buildExample, type CompNode } from '../data/example';
-import { makeEdge, edgeStyleFor, getLayer } from '../lib/edges';
+import { makeEdge, edgeStyleFor, getLayer, restyleEdge } from '../lib/edges';
 import {
   evaluatePoint,
   type ScenarioInput,
@@ -47,6 +49,7 @@ interface GraphState {
   simSettings: SimSettings;
 
   selectedId: string | null;
+  selectedEdgeId: string | null;
   clipboard: { nodes: CompNode[]; edges: Edge[] } | null;
   drawLayer: EdgeLayer;
   layerVisibility: LayerVisibility;
@@ -62,12 +65,16 @@ interface GraphState {
   onNodesChange: OnNodesChange<CompNode>;
   onEdgesChange: OnEdgesChange;
   onConnect: (c: Connection) => void;
+  onReconnect: OnReconnect;
   addComponent: (kind: string, position: XYPosition) => void;
   updateNodeData: (id: string, patch: Partial<ComponentData>) => void;
+  updateEdgeLayer: (id: string, layer: EdgeLayer) => void;
+  deleteEdge: (id: string) => void;
   deleteSelected: () => void;
   copySelection: () => void;
   pasteClipboard: () => void;
   setSelected: (id: string | null) => void;
+  setSelectedEdge: (id: string | null) => void;
   setDrawLayer: (layer: EdgeLayer) => void;
   setLayerVisibility: (v: LayerVisibility) => void;
 
@@ -152,6 +159,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   simSettings: initial.simSettings,
 
   selectedId: null,
+  selectedEdgeId: null,
   clipboard: null,
   drawLayer: 'electrical',
   layerVisibility: 'both',
@@ -191,6 +199,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     persist(get());
   },
 
+  // Dragging either end of an existing line onto a different component rewires it in place.
+  onReconnect: (oldEdge, newConnection) => {
+    const edges = applyEdgeVisibility(
+      reconnectEdge(oldEdge, newConnection, get().edges, { shouldReplaceId: false }),
+      get().layerVisibility,
+    );
+    set({ edges });
+    get().recompute();
+    persist(get());
+  },
+
   addComponent: (kind, position) => {
     const id = `${kind}_${Date.now()}_${Math.floor(position.x)}`;
     const node: CompNode = { id, type: 'component', position, data: instantiateAny(kind) };
@@ -202,6 +221,21 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   updateNodeData: (id, patch) => {
     set({
       nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
+    });
+    get().recompute();
+    persist(get());
+  },
+
+  updateEdgeLayer: (id, layer) => {
+    set({ edges: get().edges.map((e) => (e.id === id ? restyleEdge(e, layer) : e)) });
+    get().recompute();
+    persist(get());
+  },
+
+  deleteEdge: (id) => {
+    set({
+      edges: get().edges.filter((e) => e.id !== id),
+      selectedEdgeId: get().selectedEdgeId === id ? null : get().selectedEdgeId,
     });
     get().recompute();
     persist(get());
@@ -258,7 +292,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     persist(get());
   },
 
-  setSelected: (id) => set({ selectedId: id }),
+  setSelected: (id) => set({ selectedId: id, selectedEdgeId: id ? null : get().selectedEdgeId }),
+  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedId: id ? null : get().selectedId }),
   setDrawLayer: (layer) => set({ drawLayer: layer }),
   setLayerVisibility: (v) => set({ edges: applyEdgeVisibility(get().edges, v), layerVisibility: v }),
 
@@ -305,7 +340,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   newProject: () => {
-    set({ nodes: [], edges: [], externalEvents: [], selectedId: null, mcResult: null });
+    set({ nodes: [], edges: [], externalEvents: [], selectedId: null, selectedEdgeId: null, mcResult: null });
     get().recompute();
     persist(get());
   },
@@ -317,6 +352,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       edges: applyEdgeVisibility(ex.edges, get().layerVisibility),
       externalEvents: ex.externalEvents,
       selectedId: null,
+      selectedEdgeId: null,
       mcResult: null,
     });
     get().recompute();
@@ -348,6 +384,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       externalEvents: parsed.externalEvents ?? [],
       simSettings: { ...DEFAULT_SIM_SETTINGS, ...(parsed.simSettings ?? {}) },
       selectedId: null,
+      selectedEdgeId: null,
       mcResult: null,
     });
     get().recompute();

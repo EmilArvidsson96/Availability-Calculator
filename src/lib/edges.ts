@@ -45,3 +45,13 @@ export function makeEdge(
 export function getLayer(edge: Edge): EdgeLayer {
   return (edge.data as EdgeData | undefined)?.layer ?? 'electrical';
 }
+
+/** Re-layer an existing edge, refreshing its data/style/marker to match. */
+export function restyleEdge(edge: Edge, layer: EdgeLayer): Edge {
+  return {
+    ...edge,
+    data: { ...(edge.data as EdgeData | undefined), layer },
+    style: edgeStyleFor(layer, edge.selected),
+    markerEnd: { type: MarkerType.ArrowClosed, color: LAYER_COLOR[layer], width: 14, height: 14 },
+  };
+}
