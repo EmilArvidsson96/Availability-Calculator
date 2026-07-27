@@ -12,9 +12,11 @@ type Tab = 'results' | 'component' | 'external';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('results');
-  const hasSelection = useGraphStore((s) => s.selectedId !== null || s.nodes.some((n) => n.selected));
+  const hasSelection = useGraphStore(
+    (s) => s.selectedId !== null || s.selectedEdgeId !== null || s.nodes.some((n) => n.selected),
+  );
 
-  // Jump to the component editor when one or more nodes are selected.
+  // Jump to the component editor when one or more nodes/connections are selected.
   useEffect(() => {
     if (hasSelection) setTab('component');
   }, [hasSelection]);
@@ -33,7 +35,7 @@ export default function App() {
               Results
             </button>
             <button className={tab === 'component' ? 'active' : ''} onClick={() => setTab('component')}>
-              Component
+              Properties
             </button>
             <button className={tab === 'external' ? 'active' : ''} onClick={() => setTab('external')}>
               External

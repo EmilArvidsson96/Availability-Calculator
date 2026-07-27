@@ -5,33 +5,8 @@ import { componentPointAvailability, componentAvailabilityLowerBound, capacitySi
 import { formatPercent, downtimePerYear } from '../lib/format';
 import { SUBSYSTEM_LABEL } from '../data/componentLibrary';
 import { NewComponentModal } from '../canvas/NewComponentModal';
-
-function NumberField(props: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-  step?: number;
-  min?: number;
-  suffix?: string;
-  hint?: string;
-}) {
-  return (
-    <label className="field">
-      <span className="field__label">
-        {props.label}
-        {props.suffix && <span className="field__suffix">{props.suffix}</span>}
-      </span>
-      <input
-        type="number"
-        value={Number.isFinite(props.value) ? props.value : 0}
-        step={props.step ?? 1}
-        min={props.min}
-        onChange={(e) => props.onChange(parseFloat(e.target.value))}
-      />
-      {props.hint && <span className="field__hint">{props.hint}</span>}
-    </label>
-  );
-}
+import { NumberField } from './NumberField';
+import { ConnectionInspector } from './ConnectionInspector';
 
 const SOURCE_OPTIONS: { value: AvailabilitySource; label: string }[] = [
   { value: 'ESTIMATED', label: 'Estimated' },
@@ -49,12 +24,14 @@ export function Inspector() {
   const id = useGraphStore((s) => s.selectedId);
   const node = useGraphStore((s) => s.nodes.find((n) => n.id === id));
   const selectedCount = useGraphStore((s) => s.nodes.filter((n) => n.selected).length);
+  const selectedEdgeId = useGraphStore((s) => s.selectedEdgeId);
   const update = useGraphStore((s) => s.updateNodeData);
   const remove = useGraphStore((s) => s.deleteSelected);
   const confidence = useGraphStore((s) => s.simSettings.confidence);
   const [showSaveAs, setShowSaveAs] = useState(false);
 
   if (!node) {
+    if (selectedEdgeId) return <ConnectionInspector edgeId={selectedEdgeId} />;
     if (selectedCount > 1) {
       return (
         <div className="inspector inspector--empty">
@@ -68,8 +45,8 @@ export function Inspector() {
     }
     return (
       <div className="inspector inspector--empty">
-        <p>Select a component to edit its reliability inputs.</p>
-        <p className="muted">Drag components from the left palette onto the canvas, then draw electrical and communication links between them. Drag-select with the left mouse button to mark several at once; pan by dragging with the right button.</p>
+        <p>Select a component or connection to edit its reliability inputs.</p>
+        <p className="muted">Drag components from the left palette onto the canvas, then draw electrical and communication links between them. Drag-select with the left mouse button to mark several at once; pan by dragging with the right button. Click a connection line to give it its own failure model, change its layer, drag its ends to rewire it, or delete it.</p>
       </div>
     );
   }

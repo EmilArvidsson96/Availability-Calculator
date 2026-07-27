@@ -143,6 +143,116 @@ describe('raw vs contractual availability', () => {
   });
 });
 
+describe('connection failure impact window', () => {
+  function perfectSourceAndSink() {
+    return [
+      {
+        id: 'a',
+        data: estimated({
+          isElectricalSource: true,
+          availabilitySource: 'WARRANTED' as const,
+          warrantedAvailability: 1,
+        }),
+      },
+      {
+        id: 'b',
+        data: estimated({
+          isDeliverySink: true,
+          availabilitySource: 'WARRANTED' as const,
+          warrantedAvailability: 1,
+        }),
+      },
+    ];
+  }
+
+  it('an unreliable connection with no grace window reduces availability like an extra series component', () => {
+    const input: ScenarioInput = {
+      components: perfectSourceAndSink(),
+      edges: [
+        {
+          id: 'edge1',
+          source: 'a',
+          target: 'b',
+          layer: 'electrical',
+          reliability: { enabled: true, mtbfHours: 4000, mttrHours: 8, impactWindowHours: 0 },
+        },
+      ],
+      externalEvents: [],
+    };
+    const point = evaluatePoint(input);
+    expect(point.internalAvailability).toBeCloseTo(4000 / 4008, 9);
+  });
+
+  it('a grace window that fully covers the repair makes the connection effectively perfect', () => {
+    const input: ScenarioInput = {
+      components: perfectSourceAndSink(),
+      edges: [
+        {
+          id: 'edge1',
+          source: 'a',
+          target: 'b',
+          layer: 'electrical',
+          reliability: { enabled: true, mtbfHours: 4000, mttrHours: 4, impactWindowHours: 8 },
+        },
+      ],
+      externalEvents: [],
+    };
+    const point = evaluatePoint(input);
+    expect(point.internalAvailability).toBeCloseTo(1, 9);
+  });
+
+  it('a partial grace window only counts the excess repair time as downtime', () => {
+    const input: ScenarioInput = {
+      components: perfectSourceAndSink(),
+      edges: [
+        {
+          id: 'edge1',
+          source: 'a',
+          target: 'b',
+          layer: 'electrical',
+          reliability: { enabled: true, mtbfHours: 4000, mttrHours: 8, impactWindowHours: 2 },
+        },
+      ],
+      externalEvents: [],
+    };
+    const point = evaluatePoint(input);
+    expect(point.internalAvailability).toBeCloseTo(4000 / 4006, 9);
+  });
+
+  it('a connection with no reliability model behaves exactly like a perfect connection', () => {
+    const input: ScenarioInput = {
+      components: perfectSourceAndSink(),
+      edges: [{ id: 'edge1', source: 'a', target: 'b', layer: 'electrical' }],
+      externalEvents: [],
+    };
+    const point = evaluatePoint(input);
+    expect(point.internalAvailability).toBeCloseTo(1, 9);
+  });
+
+  it('reports a downtime contribution and a "connections" waterfall bucket for a failing connection', () => {
+    const input: ScenarioInput = {
+      components: perfectSourceAndSink(),
+      edges: [
+        {
+          id: 'edge1',
+          source: 'a',
+          target: 'b',
+          layer: 'electrical',
+          reliability: { enabled: true, mtbfHours: 4000, mttrHours: 8, impactWindowHours: 0 },
+        },
+      ],
+      externalEvents: [],
+    };
+    const point = evaluatePoint(input);
+    const edgeResult = point.componentResults.find((r) => r.id === 'edge1');
+    expect(edgeResult).toBeDefined();
+    expect(edgeResult!.downtimeHours).toBeGreaterThan(0);
+    const bucket = point.contributions.find((c) => c.label === 'connections');
+    expect(bucket).toBeDefined();
+    expect(bucket!.downtimeHours).toBeCloseTo(edgeResult!.downtimeHours, 6);
+  });
+});
+
 describe('warnings', () => {
   it('flags a missing source / sink', () => {
     const input: ScenarioInput = {

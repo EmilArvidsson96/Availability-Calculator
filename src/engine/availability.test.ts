@@ -9,8 +9,9 @@ import {
   componentPointAvailability,
   requiredBlocksForCapacity,
   capacitySizing,
+  connectionAvailability,
 } from './availability';
-import type { ComponentData, SoftwareLayer } from '../types/model';
+import type { ComponentData, ConnectionReliability, SoftwareLayer } from '../types/model';
 
 function warrantedBlock(partial: Partial<ComponentData>): ComponentData {
   return {
@@ -143,6 +144,28 @@ describe('BESS block capacity scaling', () => {
     expect(sizing.nameplateEnergyMWh).toBeCloseTo(120, 9);
     // 12 built vs 10 required = 20% spare margin.
     expect(sizing.marginPct).toBeCloseTo(20, 6);
+  });
+});
+
+describe('connection availability (grace window)', () => {
+  it('a disabled connection is treated as perfect', () => {
+    const r: ConnectionReliability = { enabled: false, mtbfHours: 100, mttrHours: 10, impactWindowHours: 0 };
+    expect(connectionAvailability(r)).toBe(1);
+  });
+
+  it('with no grace window, matches plain MTBF/MTTR availability', () => {
+    const r: ConnectionReliability = { enabled: true, mtbfHours: 4000, mttrHours: 8, impactWindowHours: 0 };
+    expect(connectionAvailability(r)).toBeCloseTo(pointAvailability(4000, 8), 12);
+  });
+
+  it('only the repair time beyond the window counts as downtime', () => {
+    const r: ConnectionReliability = { enabled: true, mtbfHours: 4000, mttrHours: 8, impactWindowHours: 2 };
+    expect(connectionAvailability(r)).toBeCloseTo(pointAvailability(4000, 6), 12);
+  });
+
+  it('a grace window covering the whole repair makes the connection effectively perfect', () => {
+    const r: ConnectionReliability = { enabled: true, mtbfHours: 4000, mttrHours: 4, impactWindowHours: 8 };
+    expect(connectionAvailability(r)).toBe(1);
   });
 });
 
