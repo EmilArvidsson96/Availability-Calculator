@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { runMonteCarlo, evaluatePoint, type ScenarioInput } from './compute';
-import { mtbfLowerBound } from './availability';
+import { mtbfLowerBound, kOfNAvailability } from './availability';
 import { makeRng, gammaSample } from './distributions';
 import type { ComponentData } from '../types/model';
 
@@ -18,6 +18,10 @@ function estimated(partial: Partial<ComponentData>): ComponentData {
     slaAdjustment: 1,
     redundancyN: 1,
     redundancyK: 1,
+    blockPowerMW: 0,
+    blockEnergyMWh: 0,
+    contractedPowerMW: 0,
+    contractedEnergyMWh: 0,
     isElectricalSource: false,
     isDeliverySink: false,
     isControlSource: false,
@@ -111,6 +115,31 @@ describe('raw vs contractual availability', () => {
     };
     const point = evaluatePoint(input);
     expect(point.internalAvailability).toBeCloseTo(0.985, 6);
+  });
+
+  it('applies k-of-n block-scaling redundancy to a WARRANTED BESS block', () => {
+    // 10 blocks built (n), only 8 required to meet the contracted capacity (k) —
+    // the array should show the k-of-8 confidence, not the raw single-block figure.
+    const input: ScenarioInput = {
+      components: [
+        {
+          id: 'bess',
+          data: estimated({
+            availabilitySource: 'WARRANTED',
+            warrantedAvailability: 0.97,
+            redundancyN: 10,
+            redundancyK: 8,
+            isElectricalSource: true,
+            isDeliverySink: true,
+          }),
+        },
+      ],
+      edges: [],
+      externalEvents: [],
+    };
+    const point = evaluatePoint(input);
+    expect(point.internalAvailability).toBeCloseTo(kOfNAvailability(0.97, 10, 8), 9);
+    expect(point.internalAvailability).toBeGreaterThan(0.97);
   });
 });
 

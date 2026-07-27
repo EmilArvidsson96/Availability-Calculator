@@ -68,11 +68,12 @@ export function componentPointAvailability(d: ComponentData): number {
   let base: number;
   switch (d.availabilitySource) {
     case 'WARRANTED':
-      // Warranted % is a block-level figure; node redundancy is already baked in.
-      base = clamp01(d.warrantedAvailability);
+      // Warranted % is the per-unit figure; node-level k-of-n redundancy (e.g. k of
+      // n identical warranted BESS blocks) is applied on top of it.
+      base = applyRedundancy(clamp01(d.warrantedAvailability), d);
       break;
     case 'SLA':
-      base = clamp01(d.warrantedAvailability * d.slaAdjustment);
+      base = applyRedundancy(clamp01(d.warrantedAvailability * d.slaAdjustment), d);
       break;
     case 'ESTIMATED':
     default:
@@ -89,6 +90,49 @@ export function applyRedundancy(unitAvailability: number, d: ComponentData): num
   const k = Math.max(1, Math.round(d.redundancyK));
   if (n <= 1) return unitAvailability;
   return kOfNAvailability(unitAvailability, n, Math.min(k, n));
+}
+
+/**
+ * Minimum number of identical blocks (k) needed to cover a contracted power/energy
+ * target, given each block's own MW/MWh rating — e.g. 10 blocks of 5 MW / 10 MWh
+ * against a 40 MW / 80 MWh contract need at least 8 of the 10 blocks up. Returns
+ * null when no capacity inputs are set, so the caller falls back to a manually
+ * entered k (plain k-of-n redundancy, as used for control equipment).
+ */
+export function requiredBlocksForCapacity(
+  blockPowerMW: number,
+  blockEnergyMWh: number,
+  contractedPowerMW: number,
+  contractedEnergyMWh: number,
+): number | null {
+  const ratios: number[] = [];
+  if (blockPowerMW > 0 && contractedPowerMW > 0) ratios.push(contractedPowerMW / blockPowerMW);
+  if (blockEnergyMWh > 0 && contractedEnergyMWh > 0) ratios.push(contractedEnergyMWh / blockEnergyMWh);
+  if (ratios.length === 0) return null;
+  // Tolerance guards an exact ratio (e.g. 50 / 5 = 10) from rounding up to 11.
+  return Math.max(1, Math.ceil(Math.max(...ratios) - 1e-9));
+}
+
+export interface CapacitySizing {
+  /** Blocks required (k) to meet the contracted power/energy target. */
+  requiredBlocks: number;
+  nameplatePowerMW: number;
+  nameplateEnergyMWh: number;
+  /** How much more is built than required, as a percentage of the requirement. */
+  marginPct: number;
+}
+
+/** Derive the capacity picture (required blocks, nameplate, margin) for a block node. */
+export function capacitySizing(d: ComponentData): CapacitySizing | null {
+  const k = requiredBlocksForCapacity(d.blockPowerMW, d.blockEnergyMWh, d.contractedPowerMW, d.contractedEnergyMWh);
+  if (k === null) return null;
+  const n = Math.max(1, Math.round(d.redundancyN));
+  return {
+    requiredBlocks: k,
+    nameplatePowerMW: n * d.blockPowerMW,
+    nameplateEnergyMWh: n * d.blockEnergyMWh,
+    marginPct: ((n - k) / k) * 100,
+  };
 }
 
 /**

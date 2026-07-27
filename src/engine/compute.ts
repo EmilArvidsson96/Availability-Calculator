@@ -133,9 +133,9 @@ function buildModel(input: ScenarioInput): CompiledModel {
       fixed[i] = NaN;
       estimatedIdx.push(i);
     } else if (d.availabilitySource === 'SLA') {
-      fixed[i] = clamp01(d.warrantedAvailability * d.slaAdjustment) * swFactor[i];
+      fixed[i] = applyRedundancy(clamp01(d.warrantedAvailability * d.slaAdjustment), d) * swFactor[i];
     } else {
-      fixed[i] = clamp01(d.warrantedAvailability) * swFactor[i];
+      fixed[i] = applyRedundancy(clamp01(d.warrantedAvailability), d) * swFactor[i];
     }
   });
 
