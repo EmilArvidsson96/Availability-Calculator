@@ -16,11 +16,12 @@ import {
   pointAvailability,
   softwareUnavailability,
   componentPointAvailability,
+  connectionAvailability,
   clamp01,
 } from './availability';
 import { compileNetwork, evalTree, type RelTree } from './network';
 import { gammaSample, lognormalSampleWithMean, makeRng } from './distributions';
-import type { ComponentData, EdgeLayer, ExternalEvent, SimSettings } from '../types/model';
+import type { ComponentData, ConnectionReliability, EdgeLayer, ExternalEvent, SimSettings } from '../types/model';
 
 export const HOURS_PER_YEAR = 8760;
 
@@ -29,9 +30,19 @@ export interface ScenarioComponent {
   data: ComponentData;
 }
 
+export interface ScenarioEdge {
+  /** React Flow edge id; used to report per-connection results. Falls back to `source->target` if omitted. */
+  id?: string;
+  source: string;
+  target: string;
+  layer: EdgeLayer;
+  /** Omitted or `enabled: false` means the connection is perfect (the historical behaviour). */
+  reliability?: ConnectionReliability;
+}
+
 export interface ScenarioInput {
   components: ScenarioComponent[];
-  edges: Array<{ source: string; target: string; layer: EdgeLayer }>;
+  edges: ScenarioEdge[];
   externalEvents: ExternalEvent[];
 }
 
@@ -46,6 +57,12 @@ interface CompiledModel {
   /** Fixed availabilities for WARRANTED / SLA components (NaN for ESTIMATED). */
   fixed: Float64Array;
   estimatedIdx: number[];
+  /** Number of connections with their own failure model (probability indices n..n+edgeCount-1). */
+  edgeCount: number;
+  /** Ids of those connections, parallel to their probability index (n+k). */
+  edgeIds: string[];
+  /** Fixed point availability for each of those connections, parallel to edgeIds. */
+  edgeFixed: Float64Array;
   extRawFactor: number;
   extContractualFactor: number;
   warnings: string[];
@@ -61,14 +78,23 @@ function buildModel(input: ScenarioInput): CompiledModel {
   const indexOf = new Map<string, number>();
   ids.forEach((id, i) => indexOf.set(id, i));
 
-  const elecEdges: Array<[number, number]> = [];
-  const commsEdges: Array<[number, number]> = [];
+  const elecEdges: Array<[number, number, RelTree?]> = [];
+  const commsEdges: Array<[number, number, RelTree?]> = [];
+  const edgeIds: string[] = [];
+  const edgeAvail: number[] = [];
   for (const e of input.edges) {
     const a = indexOf.get(e.source);
     const b = indexOf.get(e.target);
     if (a === undefined || b === undefined || a === b) continue;
-    if (e.layer === 'electrical') elecEdges.push([a, b]);
-    else commsEdges.push([a, b]);
+    let tree: RelTree | undefined;
+    if (e.reliability?.enabled) {
+      const varIndex = n + edgeAvail.length;
+      edgeIds.push(e.id ?? `${e.source}->${e.target}`);
+      edgeAvail.push(connectionAvailability(e.reliability));
+      tree = { op: 'var', index: varIndex };
+    }
+    if (e.layer === 'electrical') elecEdges.push([a, b, tree]);
+    else commsEdges.push([a, b, tree]);
   }
 
   const sourceIdxs: number[] = [];
@@ -132,6 +158,9 @@ function buildModel(input: ScenarioInput): CompiledModel {
     swFactor,
     fixed,
     estimatedIdx,
+    edgeCount: edgeAvail.length,
+    edgeIds,
+    edgeFixed: Float64Array.from(edgeAvail),
     extRawFactor,
     extContractualFactor,
     warnings,
@@ -139,10 +168,11 @@ function buildModel(input: ScenarioInput): CompiledModel {
 }
 
 function pointProbs(m: CompiledModel): Float64Array {
-  const probs = new Float64Array(m.n);
+  const probs = new Float64Array(m.n + m.edgeCount);
   for (let i = 0; i < m.n; i++) {
     probs[i] = Number.isNaN(m.fixed[i]) ? componentPointAvailability(m.data[i]) : m.fixed[i];
   }
+  for (let k = 0; k < m.edgeCount; k++) probs[m.n + k] = m.edgeFixed[k];
   return probs;
 }
 
@@ -176,7 +206,7 @@ export function evaluatePoint(input: ScenarioInput): PointResult {
   const raw = aInternal * m.extRawFactor;
   const contractual = aInternal * m.extContractualFactor;
 
-  // Per-component contribution: availability gained if the block were perfect.
+  // Per-component (and per-connection) contribution: availability gained if the block/link were perfect.
   const comp: ComponentResult[] = [];
   let maxContribution = 0;
   const contribRaw: number[] = new Array(m.n).fill(0);
@@ -189,6 +219,17 @@ export function evaluatePoint(input: ScenarioInput): PointResult {
     contribRaw[i] = delta;
     if (delta > maxContribution) maxContribution = delta;
   }
+  const edgeContribRaw: number[] = new Array(m.edgeCount).fill(0);
+  for (let k = 0; k < m.edgeCount; k++) {
+    const idx = m.n + k;
+    const saved = probs[idx];
+    probs[idx] = 1;
+    const aInt = evalTree(m.elecTree, probs) * evalTree(m.commsTree, probs);
+    probs[idx] = saved;
+    const delta = Math.max(0, aInt - aInternal);
+    edgeContribRaw[k] = delta;
+    if (delta > maxContribution) maxContribution = delta;
+  }
   for (let i = 0; i < m.n; i++) {
     const critical = maxContribution > 0 && contribRaw[i] >= 0.5 * maxContribution && contribRaw[i] > 0;
     comp.push({
@@ -198,8 +239,17 @@ export function evaluatePoint(input: ScenarioInput): PointResult {
       critical,
     });
   }
+  for (let k = 0; k < m.edgeCount; k++) {
+    const critical = maxContribution > 0 && edgeContribRaw[k] >= 0.5 * maxContribution && edgeContribRaw[k] > 0;
+    comp.push({
+      id: m.edgeIds[k],
+      availability: probs[m.n + k],
+      downtimeHours: edgeContribRaw[k] * HOURS_PER_YEAR,
+      critical,
+    });
+  }
 
-  // Waterfall grouped by subsystem + external events.
+  // Waterfall grouped by subsystem + connections + external events.
   const bySubsystem = new Map<string, number>();
   for (let i = 0; i < m.n; i++) {
     const key = m.data[i].subsystem;
@@ -209,6 +259,8 @@ export function evaluatePoint(input: ScenarioInput): PointResult {
   for (const [label, downtimeHours] of bySubsystem) {
     if (downtimeHours > 1e-6) contributions.push({ label, downtimeHours });
   }
+  const connDowntime = edgeContribRaw.reduce((sum, d) => sum + d * HOURS_PER_YEAR, 0);
+  if (connDowntime > 1e-6) contributions.push({ label: 'connections', downtimeHours: connDowntime });
   const extDowntime = (1 - m.extRawFactor) * HOURS_PER_YEAR;
   if (extDowntime > 1e-6) contributions.push({ label: 'external-events', downtimeHours: extDowntime });
   contributions.sort((a, b) => b.downtimeHours - a.downtimeHours);
@@ -285,8 +337,11 @@ export function runMonteCarlo(input: ScenarioInput, settings: SimSettings, onPro
   const N = Math.max(1, Math.floor(settings.samples));
   const rng = makeRng(settings.seed);
 
-  const probs = new Float64Array(m.n);
+  const probs = new Float64Array(m.n + m.edgeCount);
   for (let i = 0; i < m.n; i++) if (!Number.isNaN(m.fixed[i])) probs[i] = m.fixed[i];
+  // Connection availability is a fixed point value (no epistemic sampling), so it's set
+  // once here and never touched again in the draw loop below.
+  for (let k = 0; k < m.edgeCount; k++) probs[m.n + k] = m.edgeFixed[k];
 
   const rawDraws = new Float64Array(N);
   const conDraws = new Float64Array(N);

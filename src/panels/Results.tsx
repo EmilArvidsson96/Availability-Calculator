@@ -10,6 +10,7 @@ import {
 import { useGraphStore } from '../store/useGraphStore';
 import { formatPercent, downtimePerYear, availabilityColor, formatHours, nines } from '../lib/format';
 import { SUBSYSTEM_LABEL } from '../data/componentLibrary';
+import type { EdgeData } from '../lib/edges';
 import type { Subsystem } from '../types/model';
 
 const SAMPLE_OPTIONS = [1000, 10000, 50000, 100000];
@@ -17,6 +18,7 @@ const CONFIDENCE_OPTIONS = [0.8, 0.9, 0.95, 0.99];
 
 function labelFor(key: string): string {
   if (key === 'external-events') return 'External events';
+  if (key === 'connections') return 'Connections';
   return SUBSYSTEM_LABEL[key as Subsystem] ?? key;
 }
 
@@ -31,6 +33,7 @@ export function Results() {
   const run = useGraphStore((s) => s.runSimulation);
   const componentResults = useGraphStore((s) => s.componentResults);
   const nodes = useGraphStore((s) => s.nodes);
+  const edges = useGraphStore((s) => s.edges);
 
   const lowerPct = Math.round((1 - settings.confidence) * 100);
   const upperPct = Math.round(settings.confidence * 100);
@@ -39,8 +42,14 @@ export function Results() {
   const expected = mc ? mc.contractualPercentiles.median : point?.contractualAvailability ?? 0;
   const upper = mc ? mc.contractualPercentiles.upper : point?.contractualAvailability ?? 0;
 
-  const weakest = nodes
-    .map((n) => ({ label: n.data.label, ...componentResults[n.id] }))
+  const nodeLabel = (id: string) => nodes.find((n) => n.id === id)?.data.label ?? id;
+  const weakest = [
+    ...nodes.map((n) => ({ label: n.data.label, ...componentResults[n.id] })),
+    ...edges.map((e) => ({
+      label: (e.data as EdgeData | undefined)?.label || `${nodeLabel(e.source)} → ${nodeLabel(e.target)}`,
+      ...componentResults[e.id],
+    })),
+  ]
     .filter((r) => r.downtimeHours !== undefined && r.downtimeHours > 1e-6)
     .sort((a, b) => (b.downtimeHours ?? 0) - (a.downtimeHours ?? 0))
     .slice(0, 6);

@@ -21,7 +21,7 @@ import {
 } from '../types/model';
 import { instantiateAny } from './useCatalogStore';
 import { buildExample, type CompNode } from '../data/example';
-import { makeEdge, edgeStyleFor, getLayer, restyleEdge } from '../lib/edges';
+import { makeEdge, edgeStyleFor, getLayer, getReliability, restyleEdge, type EdgeData } from '../lib/edges';
 import {
   evaluatePoint,
   type ScenarioInput,
@@ -68,6 +68,7 @@ interface GraphState {
   onReconnect: OnReconnect;
   addComponent: (kind: string, position: XYPosition) => void;
   updateNodeData: (id: string, patch: Partial<ComponentData>) => void;
+  updateEdgeData: (id: string, patch: Partial<EdgeData>) => void;
   updateEdgeLayer: (id: string, layer: EdgeLayer) => void;
   deleteEdge: (id: string) => void;
   deleteSelected: () => void;
@@ -93,7 +94,13 @@ interface GraphState {
 function scenarioInput(state: Pick<GraphState, 'nodes' | 'edges' | 'externalEvents'>): ScenarioInput {
   return {
     components: state.nodes.map((n) => ({ id: n.id, data: n.data })),
-    edges: state.edges.map((e) => ({ source: e.source, target: e.target, layer: getLayer(e) })),
+    edges: state.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      layer: getLayer(e),
+      reliability: getReliability(e),
+    })),
     externalEvents: state.externalEvents,
   };
 }
@@ -221,6 +228,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   updateNodeData: (id, patch) => {
     set({
       nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
+    });
+    get().recompute();
+    persist(get());
+  },
+
+  updateEdgeData: (id, patch) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === id ? { ...e, data: { ...(e.data as EdgeData), ...patch } } : e,
+      ),
     });
     get().recompute();
     persist(get());

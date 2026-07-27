@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compileNetwork, evalTree, bruteForceReliability } from './network';
+import { compileNetwork, evalTree, bruteForceReliability, type RelTree } from './network';
 import { makeRng } from './distributions';
 
 function compiledValue(
@@ -51,6 +51,30 @@ describe('network structure function — hand cases', () => {
     const compiled = compiledValue(n, edges, sources, sinks, probs);
     const brute = bruteForceReliability(n, edges, sources, sinks, Float64Array.from(probs));
     expect(compiled).toBeCloseTo(brute, 9);
+  });
+});
+
+describe('network structure function — connections with their own reliability', () => {
+  it('an unreliable connection multiplies in series like a component', () => {
+    // source(0, always up) --edge(p=0.6)-- component 1 (p=0.8, sink)
+    const { tree } = compileNetwork(2, [[0, 1, { op: 'var', index: 2 }]], [0], [1]);
+    const v = evalTree(tree, Float64Array.from([1, 0.8, 0.6]));
+    expect(v).toBeCloseTo(1 * 0.6 * 0.8, 9);
+  });
+
+  it('two parallel connections between the same pair combine like parallel components', () => {
+    const edges: Array<[number, number, RelTree?]> = [
+      [0, 1, { op: 'var', index: 2 }],
+      [0, 1, { op: 'var', index: 3 }],
+    ];
+    const { tree } = compileNetwork(2, edges, [0], [1]);
+    const v = evalTree(tree, Float64Array.from([1, 1, 0.6, 0.7]));
+    expect(v).toBeCloseTo(1 - (1 - 0.6) * (1 - 0.7), 9);
+  });
+
+  it('an edge with no tree (undefined) stays perfect, same as the historical two-tuple form', () => {
+    const v = compiledValue(2, [[0, 1]], [0], [1], [0.9, 0.8]);
+    expect(v).toBeCloseTo(0.9 * 0.8, 9);
   });
 });
 

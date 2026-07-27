@@ -1,5 +1,5 @@
 import { MarkerType, type Edge } from '@xyflow/react';
-import type { EdgeLayer } from '../types/model';
+import { DEFAULT_CONNECTION_RELIABILITY, type ConnectionReliability, type EdgeLayer } from '../types/model';
 
 export const LAYER_COLOR: Record<EdgeLayer, string> = {
   electrical: '#ea580c',
@@ -19,6 +19,9 @@ export function edgeStyleFor(layer: EdgeLayer, highlighted = false) {
 
 export interface EdgeData {
   layer: EdgeLayer;
+  /** Optional custom name shown in the inspector and results (defaults to "source → target"). */
+  label?: string;
+  reliability: ConnectionReliability;
   [key: string]: unknown;
 }
 
@@ -36,7 +39,7 @@ export function makeEdge(
     target,
     sourceHandle: sourceHandle ?? undefined,
     targetHandle: targetHandle ?? undefined,
-    data: { layer },
+    data: { layer, reliability: { ...DEFAULT_CONNECTION_RELIABILITY } },
     style: edgeStyleFor(layer),
     markerEnd: { type: MarkerType.ArrowClosed, color: LAYER_COLOR[layer], width: 14, height: 14 },
   };
@@ -44,6 +47,11 @@ export function makeEdge(
 
 export function getLayer(edge: Edge): EdgeLayer {
   return (edge.data as EdgeData | undefined)?.layer ?? 'electrical';
+}
+
+/** A connection's reliability model, defaulting to "perfect" for edges saved before this existed. */
+export function getReliability(edge: Edge): ConnectionReliability {
+  return (edge.data as EdgeData | undefined)?.reliability ?? DEFAULT_CONNECTION_RELIABILITY;
 }
 
 /** Re-layer an existing edge, refreshing its data/style/marker to match. */

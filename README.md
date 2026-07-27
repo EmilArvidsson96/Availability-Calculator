@@ -43,6 +43,12 @@ same way (a control source must reach the delivery point); its availability mult
 electrical result. Comms marked *dispatch-only* / *monitoring* feed a separate revenue metric, so a
 cloud outage isn't mis-counted as a power outage.
 
+By default, **connections are perfect** — only the components at each end can fail. Click a
+connection to give it its own MTBF/MTTR, plus an **"hours without impact" grace window**: if the
+link fails, only the repair time beyond that window counts as downtime (the rest is assumed bridged
+by local buffering, a backup path, or manual failover). This is how to model something like "if the
+grid interconnection drops, we're fine for 2 hours before it affects availability."
+
 ### Confidence — what you can promise
 "Confidence" here addresses **epistemic** uncertainty (we don't know the *true* MTBF/MTTR), not the
 random scatter of individual failures. A **parametric-bootstrap Monte Carlo** samples each estimated
@@ -75,7 +81,8 @@ modelled confidence bound **for guidance, not a contractual guarantee**.
 2. **Connect** them. Pick the layer with the *Draw connections as* toggle: **⚡ Electrical** (solid
    orange) or **📡 Comms** (dashed purple). Use the *View layer* toggle to focus on one layer.
 3. Select a component to edit its **MTBF/MTTR or warranty %**, redundancy, software layer, and
-   **network role** (electrical source, delivery sink, control source).
+   **network role** (electrical source, delivery sink, control source). Select a connection instead
+   to give it its own failure model and an **"hours without impact" grace window**.
 4. Add **external events** in the External tab.
 5. Click **Run Monte Carlo** to get the P5/P50/P95 distribution, the downtime-contribution waterfall,
    and the highlighted weakest links.
