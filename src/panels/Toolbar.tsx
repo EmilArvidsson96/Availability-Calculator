@@ -1,12 +1,16 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useGraphStore } from '../store/useGraphStore';
+import { AUTH_ENABLED, useAuthStore } from '../auth/useAuthStore';
+import { PrivateDataPanel } from './PrivateDataPanel';
 
 export function Toolbar() {
   const exportJson = useGraphStore((s) => s.exportJson);
   const importJson = useGraphStore((s) => s.importJson);
   const newProject = useGraphStore((s) => s.newProject);
   const loadExample = useGraphStore((s) => s.loadExample);
+  const logout = useAuthStore((s) => s.logout);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [showSync, setShowSync] = useState(false);
 
   const doExport = () => {
     const blob = new Blob([exportJson()], { type: 'application/json' });
@@ -52,6 +56,9 @@ export function Toolbar() {
         <button className="btn btn--ghost" onClick={doExport}>
           Export
         </button>
+        <button className="btn btn--ghost" onClick={() => setShowSync(true)}>
+          Private data
+        </button>
         <input
           ref={fileRef}
           type="file"
@@ -63,7 +70,13 @@ export function Toolbar() {
             e.target.value = '';
           }}
         />
+        {AUTH_ENABLED && (
+          <button className="btn btn--ghost" onClick={logout}>
+            Log out
+          </button>
+        )}
       </div>
+      {showSync && <PrivateDataPanel onClose={() => setShowSync(false)} />}
     </header>
   );
 }

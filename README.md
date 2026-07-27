@@ -100,6 +100,48 @@ To enable it once: **repository → Settings → Pages → Build and deployment 
 Actions"**. The site is then served at `https://<owner>.github.io/Availability-Calculator/`
 (the Vite `base` is set accordingly in `vite.config.ts`).
 
+## Keeping company data private
+
+Everything checked into *this* repo — the component palette, the example site — is illustrative
+only. Real project data (actual site configurations, MTBF/MTTR figures, warranted availabilities,
+project names) shouldn't be committed here at all. Instead:
+
+1. Create a separate **private** GitHub repo to hold it (e.g. `availability-calculator-data`), with
+   a `projects/` folder for exported model JSON files.
+2. In the app, open **Private data** in the toolbar, fill in that repo's owner/name/branch, and
+   paste in a GitHub [personal access token](https://github.com/settings/tokens) — ideally a
+   fine-grained token scoped to just that one repo with **Contents: Read and write** — nothing
+   else.
+3. Use **Save to repo** / **Load** in that panel to push and pull project files.
+
+The token and repo settings are saved only in your browser's `localStorage` and are sent only to
+`api.github.com` (which supports token-authenticated requests directly from a browser, the same
+way tools like github.dev do) — they're never bundled into the deployed app or committed anywhere.
+Rotate or revoke the token from GitHub any time.
+
+## Login gate
+
+The app can sit behind a simple username/password screen (`src/auth/`). **Read this before relying
+on it**: this app is a static site with no backend, so the "gate" is a check that runs in the
+visitor's own browser. It stops someone from casually opening the link, but anyone who opens dev
+tools can read the code and work around it — it is not a real access-control boundary. Don't use it
+as the only thing standing between the public internet and information that actually needs to stay
+confidential; for that, keep the data out of the deployed build entirely (see above) and/or don't
+publish the site as a public GitHub Pages URL in the first place.
+
+To enable it:
+
+1. Generate a password hash: `npm run hash-password -- "your-password"`.
+2. **Locally**: copy `.env.local.example` to `.env.local` and fill in `VITE_AUTH_USERNAME` and
+   `VITE_AUTH_PASSWORD_HASH` (the hash from step 1). `.env.local` is gitignored.
+3. **Deployed build**: in the repo's **Settings → Secrets and variables → Actions**, add repo
+   secrets `AUTH_USERNAME` and `AUTH_PASSWORD_HASH` (same two values). The deploy workflow passes
+   them into the build as `VITE_AUTH_USERNAME` / `VITE_AUTH_PASSWORD_HASH`.
+
+Leaving `VITE_AUTH_PASSWORD_HASH` unset disables the gate entirely (the default, so local dev
+without a `.env.local` behaves exactly as before). A logged-in session is remembered in
+`localStorage` until **Log out** is clicked or the password is rotated.
+
 ## Tech stack
 
 Vite · React · TypeScript · [@xyflow/react](https://reactflow.dev) (canvas) · Zustand (state) ·
@@ -114,7 +156,8 @@ src/
   data/          component palette/taxonomy and the example site
   store/         Zustand store (graph, results, persistence, worker orchestration)
   canvas/        React Flow canvas, custom node, palette
-  panels/        toolbar, inspector, results, external-events
-  lib/           edge styling + formatting helpers
+  panels/        toolbar, inspector, results, external-events, private-data sync panel
+  auth/          login gate (see "Login gate" above)
+  lib/           edge styling, formatting helpers, GitHub sync client
   types/         domain model
 ```
