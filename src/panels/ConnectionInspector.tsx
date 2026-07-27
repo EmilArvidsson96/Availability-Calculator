@@ -1,15 +1,23 @@
-import type { Edge } from '@xyflow/react';
 import { useGraphStore } from '../store/useGraphStore';
-import type { ConnectionReliability } from '../types/model';
+import type { ConnectionReliability, EdgeLayer } from '../types/model';
 import { getLayer, getReliability, type EdgeData } from '../lib/edges';
 import { connectionAvailability } from '../engine/availability';
 import { formatPercent, downtimePerYear } from '../lib/format';
 import { NumberField } from './NumberField';
 
-export function ConnectionInspector({ edge }: { edge: Edge }) {
-  const updateEdgeData = useGraphStore((s) => s.updateEdgeData);
-  const deleteEdge = useGraphStore((s) => s.deleteEdge);
+const EDGE_LAYER_OPTIONS: { value: EdgeLayer; label: string }[] = [
+  { value: 'electrical', label: '⚡ Electrical' },
+  { value: 'communication', label: '📡 Comms' },
+];
+
+export function ConnectionInspector({ edgeId }: { edgeId: string }) {
+  const edge = useGraphStore((s) => s.edges.find((e) => e.id === edgeId));
   const nodes = useGraphStore((s) => s.nodes);
+  const updateEdgeData = useGraphStore((s) => s.updateEdgeData);
+  const updateEdgeLayer = useGraphStore((s) => s.updateEdgeLayer);
+  const deleteEdge = useGraphStore((s) => s.deleteEdge);
+
+  if (!edge) return null;
 
   const data = (edge.data ?? {}) as Partial<EdgeData>;
   const reliability = getReliability(edge);
@@ -33,7 +41,6 @@ export function ConnectionInspector({ edge }: { edge: Edge }) {
           value={data.label ?? ''}
           onChange={(e) => set({ label: e.target.value })}
         />
-        <span className="muted">{layer === 'electrical' ? '⚡ Electrical connection' : '📡 Communication connection'}</span>
       </div>
 
       <div className="inspector__result">
@@ -46,6 +53,22 @@ export function ConnectionInspector({ edge }: { edge: Edge }) {
           <strong>{downtimePerYear(availability)}</strong>
         </div>
       </div>
+
+      <section className="inspector__section">
+        <h4>Layer</h4>
+        <div className="segmented">
+          {EDGE_LAYER_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              className={layer === o.value ? `active active--${o.value}` : ''}
+              onClick={() => updateEdgeLayer(edge.id, o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <span className="field__hint">Drag either end of the line on the canvas to reconnect it to a different component.</span>
+      </section>
 
       <section className="inspector__section">
         <h4>

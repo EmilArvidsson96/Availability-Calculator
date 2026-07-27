@@ -35,8 +35,10 @@ export function Canvas() {
   const onNodesChange = useGraphStore((s) => s.onNodesChange);
   const onEdgesChange = useGraphStore((s) => s.onEdgesChange);
   const onConnect = useGraphStore((s) => s.onConnect);
+  const onReconnect = useGraphStore((s) => s.onReconnect);
   const addComponent = useGraphStore((s) => s.addComponent);
   const setSelected = useGraphStore((s) => s.setSelected);
+  const setSelectedEdge = useGraphStore((s) => s.setSelectedEdge);
   const copySelection = useGraphStore((s) => s.copySelection);
   const pasteClipboard = useGraphStore((s) => s.pasteClipboard);
   const drawLayer = useGraphStore((s) => s.drawLayer);
@@ -71,12 +73,11 @@ export function Canvas() {
   );
 
   const onSelectionChange = useCallback<OnSelectionChangeFunc>(
-    ({ nodes: selNodes, edges: selEdges }) => {
-      if (selNodes.length === 1 && selEdges.length === 0) setSelected(selNodes[0].id);
-      else if (selEdges.length === 1 && selNodes.length === 0) setSelected(selEdges[0].id);
-      else setSelected(null);
+    ({ nodes: selectedNodes, edges: selectedEdges }) => {
+      setSelected(selectedNodes.length === 1 ? selectedNodes[0].id : null);
+      setSelectedEdge(selectedNodes.length === 0 && selectedEdges.length === 1 ? selectedEdges[0].id : null);
     },
-    [setSelected],
+    [setSelected, setSelectedEdge],
   );
 
   // Ctrl/Cmd+C copies the marked components, Ctrl/Cmd+V pastes them back in as a new, offset selection.
@@ -109,6 +110,7 @@ export function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
         onSelectionChange={onSelectionChange}
         panOnDrag={[2]}
         selectionOnDrag

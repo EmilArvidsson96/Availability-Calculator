@@ -13,7 +13,7 @@ type Tab = 'results' | 'component' | 'external';
 export default function App() {
   const [tab, setTab] = useState<Tab>('results');
   const hasSelection = useGraphStore(
-    (s) => s.selectedId !== null || s.nodes.some((n) => n.selected) || s.edges.some((e) => e.selected),
+    (s) => s.selectedId !== null || s.selectedEdgeId !== null || s.nodes.some((n) => n.selected),
   );
 
   // Jump to the component editor when one or more nodes/connections are selected.
