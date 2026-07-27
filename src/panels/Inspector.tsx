@@ -48,16 +48,28 @@ const CONFIDENCE_PRESETS = [
 export function Inspector() {
   const id = useGraphStore((s) => s.selectedId);
   const node = useGraphStore((s) => s.nodes.find((n) => n.id === id));
+  const selectedCount = useGraphStore((s) => s.nodes.filter((n) => n.selected).length);
   const update = useGraphStore((s) => s.updateNodeData);
   const remove = useGraphStore((s) => s.deleteSelected);
   const confidence = useGraphStore((s) => s.simSettings.confidence);
   const [showSaveAs, setShowSaveAs] = useState(false);
 
   if (!node) {
+    if (selectedCount > 1) {
+      return (
+        <div className="inspector inspector--empty">
+          <p>{selectedCount} components selected.</p>
+          <p className="muted">Press Ctrl/Cmd+C to copy, Ctrl/Cmd+V to paste, or Delete to remove them.</p>
+          <button className="btn btn--danger" onClick={remove}>
+            Delete {selectedCount} components
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="inspector inspector--empty">
         <p>Select a component to edit its reliability inputs.</p>
-        <p className="muted">Drag components from the left palette onto the canvas, then draw electrical and communication links between them.</p>
+        <p className="muted">Drag components from the left palette onto the canvas, then draw electrical and communication links between them. Drag-select with the left mouse button to mark several at once; pan by dragging with the right button.</p>
       </div>
     );
   }

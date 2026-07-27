@@ -22,11 +22,20 @@ export interface EdgeData {
   [key: string]: unknown;
 }
 
-export function makeEdge(id: string, source: string, target: string, layer: EdgeLayer): Edge {
+export function makeEdge(
+  id: string,
+  source: string,
+  target: string,
+  layer: EdgeLayer,
+  sourceHandle?: string | null,
+  targetHandle?: string | null,
+): Edge {
   return {
     id,
     source,
     target,
+    sourceHandle: sourceHandle ?? undefined,
+    targetHandle: targetHandle ?? undefined,
     data: { layer },
     style: edgeStyleFor(layer),
     markerEnd: { type: MarkerType.ArrowClosed, color: LAYER_COLOR[layer], width: 14, height: 14 },
