@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -6,8 +6,10 @@ import {
   MiniMap,
   Panel,
   ConnectionMode,
+  SelectionMode,
   useReactFlow,
   type Node,
+  type OnSelectionChangeFunc,
   BackgroundVariant,
 } from '@xyflow/react';
 import { useGraphStore, type LayerVisibility } from '../store/useGraphStore';
@@ -35,6 +37,8 @@ export function Canvas() {
   const onConnect = useGraphStore((s) => s.onConnect);
   const addComponent = useGraphStore((s) => s.addComponent);
   const setSelected = useGraphStore((s) => s.setSelected);
+  const copySelection = useGraphStore((s) => s.copySelection);
+  const pasteClipboard = useGraphStore((s) => s.pasteClipboard);
   const drawLayer = useGraphStore((s) => s.drawLayer);
   const setDrawLayer = useGraphStore((s) => s.setDrawLayer);
   const layerVisibility = useGraphStore((s) => s.layerVisibility);
@@ -66,6 +70,32 @@ export function Canvas() {
     [componentResults],
   );
 
+  const onSelectionChange = useCallback<OnSelectionChangeFunc>(
+    ({ nodes: selected }) => setSelected(selected.length === 1 ? selected[0].id : null),
+    [setSelected],
+  );
+
+  // Ctrl/Cmd+C copies the marked components, Ctrl/Cmd+V pastes them back in as a new, offset selection.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'c') {
+        if (window.getSelection()?.toString()) return; // let the browser copy a text selection instead
+        copySelection();
+        event.preventDefault();
+      } else if (key === 'v') {
+        pasteClipboard();
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [copySelection, pasteClipboard]);
+
   return (
     <div className="canvas" ref={wrapper} onDrop={onDrop} onDragOver={onDragOver}>
       <ReactFlow
@@ -75,8 +105,11 @@ export function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeClick={(_, node) => setSelected(node.id)}
-        onPaneClick={() => setSelected(null)}
+        onSelectionChange={onSelectionChange}
+        panOnDrag={[2]}
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
+        deleteKeyCode={['Backspace', 'Delete']}
         connectionMode={ConnectionMode.Loose}
         fitView
         proOptions={{ hideAttribution: true }}

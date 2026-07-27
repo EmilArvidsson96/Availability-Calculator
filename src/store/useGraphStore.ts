@@ -47,6 +47,7 @@ interface GraphState {
   simSettings: SimSettings;
 
   selectedId: string | null;
+  clipboard: { nodes: CompNode[]; edges: Edge[] } | null;
   drawLayer: EdgeLayer;
   layerVisibility: LayerVisibility;
 
@@ -64,6 +65,8 @@ interface GraphState {
   addComponent: (kind: string, position: XYPosition) => void;
   updateNodeData: (id: string, patch: Partial<ComponentData>) => void;
   deleteSelected: () => void;
+  copySelection: () => void;
+  pasteClipboard: () => void;
   setSelected: (id: string | null) => void;
   setDrawLayer: (layer: EdgeLayer) => void;
   setLayerVisibility: (v: LayerVisibility) => void;
@@ -149,6 +152,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   simSettings: initial.simSettings,
 
   selectedId: null,
+  clipboard: null,
   drawLayer: 'electrical',
   layerVisibility: 'both',
 
@@ -204,13 +208,52 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   deleteSelected: () => {
-    const id = get().selectedId;
-    if (!id) return;
+    const ids = new Set(get().nodes.filter((n) => n.selected).map((n) => n.id));
+    if (ids.size === 0) return;
     set({
-      nodes: get().nodes.filter((n) => n.id !== id),
-      edges: get().edges.filter((e) => e.source !== id && e.target !== id),
+      nodes: get().nodes.filter((n) => !ids.has(n.id)),
+      edges: get().edges.filter((e) => !ids.has(e.source) && !ids.has(e.target)),
       selectedId: null,
     });
+    get().recompute();
+    persist(get());
+  },
+
+  copySelection: () => {
+    const selectedNodes = get().nodes.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const ids = new Set(selectedNodes.map((n) => n.id));
+    const selectedEdges = get().edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+    set({ clipboard: { nodes: selectedNodes, edges: selectedEdges } });
+  },
+
+  pasteClipboard: () => {
+    const clip = get().clipboard;
+    if (!clip || clip.nodes.length === 0) return;
+    const stamp = Date.now();
+    const suffix = Math.floor(Math.random() * 1e6);
+    const idMap = new Map<string, string>();
+    const pastedNodes: CompNode[] = clip.nodes.map((n, i) => {
+      const id = `${n.data.kind}_${stamp}_${suffix}_${i}`;
+      idMap.set(n.id, id);
+      return {
+        ...n,
+        id,
+        selected: true,
+        position: { x: n.position.x + 40, y: n.position.y + 40 },
+        data: { ...n.data },
+      };
+    });
+    const pastedEdges: Edge[] = clip.edges.map((e, i) => ({
+      ...makeEdge(`e_${stamp}_${suffix}_${i}`, idMap.get(e.source)!, idMap.get(e.target)!, getLayer(e)),
+      selected: true,
+    }));
+    const nodes = [...get().nodes.map((n) => ({ ...n, selected: false })), ...pastedNodes];
+    const edges = applyEdgeVisibility(
+      [...get().edges.map((e) => ({ ...e, selected: false })), ...pastedEdges],
+      get().layerVisibility,
+    );
+    set({ nodes, edges, selectedId: pastedNodes.length === 1 ? pastedNodes[0].id : null });
     get().recompute();
     persist(get());
   },
