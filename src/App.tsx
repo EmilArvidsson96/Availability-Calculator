@@ -12,12 +12,12 @@ type Tab = 'results' | 'component' | 'external';
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('results');
-  const selectedId = useGraphStore((s) => s.selectedId);
+  const hasSelection = useGraphStore((s) => s.selectedId !== null || s.nodes.some((n) => n.selected));
 
-  // Jump to the component editor when a node is selected.
+  // Jump to the component editor when one or more nodes are selected.
   useEffect(() => {
-    if (selectedId) setTab('component');
-  }, [selectedId]);
+    if (hasSelection) setTab('component');
+  }, [hasSelection]);
 
   return (
     <div className="app">
