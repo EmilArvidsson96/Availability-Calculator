@@ -184,7 +184,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   onConnect: (c) => {
     const layer = get().drawLayer;
     const id = `e_${c.source}_${c.target}_${layer}_${Date.now()}`;
-    const edge = makeEdge(id, c.source!, c.target!, layer);
+    const edge = makeEdge(id, c.source!, c.target!, layer, c.sourceHandle, c.targetHandle);
     const edges = applyEdgeVisibility(rfAddEdge(edge, get().edges), get().layerVisibility);
     set({ edges });
     get().recompute();

@@ -60,16 +60,16 @@ export function buildExample(): { nodes: CompNode[]; edges: Edge[]; externalEven
   const eid = () => `e${++e}`;
   const edges: Edge[] = [];
   for (let i = 0; i < elecChain.length - 1; i++) {
-    edges.push(makeEdge(eid(), elecChain[i].id, elecChain[i + 1].id, 'electrical'));
+    edges.push(makeEdge(eid(), elecChain[i].id, elecChain[i + 1].id, 'electrical', 'r', 'l'));
   }
   // Control path: EMS -> switch -> gateway -> grid (delivery point).
-  edges.push(makeEdge(eid(), ems.id, sw.id, 'communication'));
-  edges.push(makeEdge(eid(), sw.id, gw.id, 'communication'));
-  edges.push(makeEdge(eid(), gw.id, grid.id, 'communication'));
+  edges.push(makeEdge(eid(), ems.id, sw.id, 'communication', 'r', 'l'));
+  edges.push(makeEdge(eid(), sw.id, gw.id, 'communication', 'r', 'l'));
+  edges.push(makeEdge(eid(), gw.id, grid.id, 'communication', 't', 'b'));
   // Dispatch path: cloud <-> WAN <-> EMS, market -> WAN.
-  edges.push(makeEdge(eid(), cloud.id, wan.id, 'communication'));
-  edges.push(makeEdge(eid(), wan.id, ems.id, 'communication'));
-  edges.push(makeEdge(eid(), market.id, wan.id, 'communication'));
+  edges.push(makeEdge(eid(), cloud.id, wan.id, 'communication', 'r', 'l'));
+  edges.push(makeEdge(eid(), wan.id, ems.id, 'communication', 't', 'b'));
+  edges.push(makeEdge(eid(), market.id, wan.id, 'communication', 'r', 'l'));
 
   const externalEvents: ExternalEvent[] = [
     { id: 'grid-outage', label: 'Grid outage / curtailment', freqPerYear: 2, meanDurationHours: 6, includeInContractual: false },
