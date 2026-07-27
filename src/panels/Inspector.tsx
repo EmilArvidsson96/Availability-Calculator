@@ -1,10 +1,60 @@
 import { useState } from 'react';
 import { useGraphStore } from '../store/useGraphStore';
-import type { AvailabilitySource, ComponentData, ControlMode } from '../types/model';
+import type { AvailabilitySource, ComponentData, ControlMode, EdgeLayer } from '../types/model';
 import { componentPointAvailability, componentAvailabilityLowerBound } from '../engine/availability';
 import { formatPercent, downtimePerYear } from '../lib/format';
 import { SUBSYSTEM_LABEL } from '../data/componentLibrary';
 import { NewComponentModal } from '../canvas/NewComponentModal';
+import { getLayer } from '../lib/edges';
+
+const EDGE_LAYER_OPTIONS: { value: EdgeLayer; label: string }[] = [
+  { value: 'electrical', label: '⚡ Electrical' },
+  { value: 'communication', label: '📡 Comms' },
+];
+
+function EdgeInspector({ edgeId }: { edgeId: string }) {
+  const edge = useGraphStore((s) => s.edges.find((e) => e.id === edgeId));
+  const nodes = useGraphStore((s) => s.nodes);
+  const updateEdgeLayer = useGraphStore((s) => s.updateEdgeLayer);
+  const deleteEdge = useGraphStore((s) => s.deleteEdge);
+
+  if (!edge) return null;
+
+  const layer = getLayer(edge);
+  const sourceLabel = (nodes.find((n) => n.id === edge.source)?.data as ComponentData | undefined)?.label ?? edge.source;
+  const targetLabel = (nodes.find((n) => n.id === edge.target)?.data as ComponentData | undefined)?.label ?? edge.target;
+
+  return (
+    <div className="inspector">
+      <div className="inspector__title">
+        <div>Connection</div>
+        <span className="muted">
+          {sourceLabel} → {targetLabel}
+        </span>
+      </div>
+
+      <section className="inspector__section">
+        <h4>Layer</h4>
+        <div className="segmented">
+          {EDGE_LAYER_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              className={layer === o.value ? `active active--${o.value}` : ''}
+              onClick={() => updateEdgeLayer(edge.id, o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <span className="field__hint">Drag either end of the line on the canvas to reconnect it to a different component.</span>
+      </section>
+
+      <button className="btn btn--danger" onClick={() => deleteEdge(edge.id)}>
+        Delete connection
+      </button>
+    </div>
+  );
+}
 
 function NumberField(props: {
   label: string;
@@ -49,6 +99,7 @@ export function Inspector() {
   const id = useGraphStore((s) => s.selectedId);
   const node = useGraphStore((s) => s.nodes.find((n) => n.id === id));
   const selectedCount = useGraphStore((s) => s.nodes.filter((n) => n.selected).length);
+  const selectedEdgeId = useGraphStore((s) => s.selectedEdgeId);
   const update = useGraphStore((s) => s.updateNodeData);
   const remove = useGraphStore((s) => s.deleteSelected);
   const confidence = useGraphStore((s) => s.simSettings.confidence);
@@ -66,10 +117,13 @@ export function Inspector() {
         </div>
       );
     }
+    if (selectedEdgeId) {
+      return <EdgeInspector edgeId={selectedEdgeId} />;
+    }
     return (
       <div className="inspector inspector--empty">
         <p>Select a component to edit its reliability inputs.</p>
-        <p className="muted">Drag components from the left palette onto the canvas, then draw electrical and communication links between them. Drag-select with the left mouse button to mark several at once; pan by dragging with the right button.</p>
+        <p className="muted">Drag components from the left palette onto the canvas, then draw electrical and communication links between them. Drag-select with the left mouse button to mark several at once; pan by dragging with the right button. Click a connection line to change its layer, drag its ends to rewire it, or delete it.</p>
       </div>
     );
   }
