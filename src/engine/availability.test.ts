@@ -6,8 +6,46 @@ import {
   kOfNAvailability,
   softwareUnavailability,
   mtbfLowerBound,
+  componentPointAvailability,
+  requiredBlocksForCapacity,
+  capacitySizing,
 } from './availability';
-import type { SoftwareLayer } from '../types/model';
+import type { ComponentData, SoftwareLayer } from '../types/model';
+
+function warrantedBlock(partial: Partial<ComponentData>): ComponentData {
+  return {
+    kind: 'bess-block',
+    label: 'block',
+    subsystem: 'aggregated',
+    availabilitySource: 'WARRANTED',
+    mtbfHours: 100000,
+    mttrHours: 24,
+    effectiveFailures: 10,
+    mttrLogSigma: 0.5,
+    warrantedAvailability: 0.97,
+    slaAdjustment: 1,
+    redundancyN: 1,
+    redundancyK: 1,
+    blockPowerMW: 0,
+    blockEnergyMWh: 0,
+    contractedPowerMW: 0,
+    contractedEnergyMWh: 0,
+    isElectricalSource: false,
+    isDeliverySink: false,
+    isControlSource: false,
+    controlMode: 'delivery',
+    software: {
+      enabled: false,
+      failuresPerYear: 0,
+      watchdogCoverage: 1,
+      mttrAutoHours: 0,
+      mttrRebootHours: 0,
+      plannedPatchHoursPerYear: 0,
+    },
+    spof: false,
+    ...partial,
+  };
+}
 
 describe('elementary availability', () => {
   it('single repairable unit', () => {
@@ -59,6 +97,52 @@ describe('software layer', () => {
     };
     const highCoverage = { ...base, watchdogCoverage: 0.95 };
     expect(softwareUnavailability(highCoverage)).toBeLessThan(softwareUnavailability(base));
+  });
+});
+
+describe('BESS block capacity scaling', () => {
+  it('applies k-of-n redundancy to a WARRANTED block using its own availability as the per-unit figure', () => {
+    const d = warrantedBlock({ redundancyN: 10, redundancyK: 8 });
+    const expected = kOfNAvailability(0.97, 10, 8);
+    expect(componentPointAvailability(d)).toBeCloseTo(expected, 9);
+  });
+
+  it('a single warranted block (n=1) is unaffected, matching prior behaviour', () => {
+    const d = warrantedBlock({});
+    expect(componentPointAvailability(d)).toBeCloseTo(0.97, 9);
+  });
+
+  it('derives required blocks from whichever of power/energy is more binding', () => {
+    // 40 MW / 5 MW per block = 8; 80 MWh / 10 MWh per block = 8.
+    expect(requiredBlocksForCapacity(5, 10, 40, 80)).toBe(8);
+    // Power now binds harder: 47 MW needs 10 blocks (ceil(47/5)), energy only needs 8.
+    expect(requiredBlocksForCapacity(5, 10, 47, 80)).toBe(10);
+  });
+
+  it('is not thrown off by floating-point rounding at an exact ratio', () => {
+    expect(requiredBlocksForCapacity(5, 10, 50, 100)).toBe(10);
+  });
+
+  it('returns null when no capacity inputs are set, leaving k to be entered by hand', () => {
+    expect(requiredBlocksForCapacity(0, 0, 0, 0)).toBeNull();
+    expect(capacitySizing(warrantedBlock({}))).toBeNull();
+  });
+
+  it('reports nameplate capacity and spare margin for n built vs k required', () => {
+    const d = warrantedBlock({
+      redundancyN: 12,
+      redundancyK: 10,
+      blockPowerMW: 5,
+      blockEnergyMWh: 10,
+      contractedPowerMW: 50,
+      contractedEnergyMWh: 100,
+    });
+    const sizing = capacitySizing(d)!;
+    expect(sizing.requiredBlocks).toBe(10);
+    expect(sizing.nameplatePowerMW).toBeCloseTo(60, 9);
+    expect(sizing.nameplateEnergyMWh).toBeCloseTo(120, 9);
+    // 12 built vs 10 required = 20% spare margin.
+    expect(sizing.marginPct).toBeCloseTo(20, 6);
   });
 });
 

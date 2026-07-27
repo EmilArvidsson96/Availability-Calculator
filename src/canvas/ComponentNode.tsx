@@ -6,6 +6,7 @@ import { useGraphStore } from '../store/useGraphStore';
 import { SUBSYSTEM_COLOR } from '../data/componentLibrary';
 import { resolveTemplate } from '../store/useCatalogStore';
 import { availabilityColor, formatPercent } from '../lib/format';
+import { capacitySizing } from '../engine/availability';
 
 const SOURCE_BADGE: Record<ComponentData['availabilitySource'], string> = {
   WARRANTED: 'WAR',
@@ -20,6 +21,7 @@ function ComponentNodeImpl({ id, data, selected }: NodeProps<CompNode>) {
   const icon = resolveTemplate(d.kind)?.icon ?? '⬛';
   const availability = result?.availability;
   const critical = result?.critical;
+  const sizing = d.subsystem === 'aggregated' ? capacitySizing(d) : null;
 
   const handleStyle = { width: 9, height: 9, background: '#475569', border: '2px solid #fff' };
 
@@ -43,6 +45,11 @@ function ComponentNodeImpl({ id, data, selected }: NodeProps<CompNode>) {
         {d.redundancyN > 1 && (
           <span className="badge badge--redundancy">
             {d.redundancyK}/{d.redundancyN}
+          </span>
+        )}
+        {sizing && (
+          <span className="badge badge--capacity">
+            {sizing.marginPct >= 0 ? '+' : ''}{sizing.marginPct.toFixed(0)}%
           </span>
         )}
         {d.spof && <span className="badge badge--spof">SPOF</span>}

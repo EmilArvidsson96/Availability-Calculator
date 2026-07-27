@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGraphStore } from '../store/useGraphStore';
 import type { AvailabilitySource, ComponentData, ControlMode } from '../types/model';
-import { componentPointAvailability, componentAvailabilityLowerBound } from '../engine/availability';
+import { componentPointAvailability, componentAvailabilityLowerBound, capacitySizing } from '../engine/availability';
 import { formatPercent, downtimePerYear } from '../lib/format';
 import { SUBSYSTEM_LABEL } from '../data/componentLibrary';
 import { NewComponentModal } from '../canvas/NewComponentModal';
@@ -78,6 +78,7 @@ export function Inspector() {
   const set = (patch: Partial<ComponentData>) => update(node.id, patch);
   const point = componentPointAvailability(d);
   const lower = componentAvailabilityLowerBound(d, confidence);
+  const sizing = d.subsystem === 'aggregated' ? capacitySizing(d) : null;
 
   return (
     <div className="inspector">
@@ -159,16 +160,55 @@ export function Inspector() {
         )}
       </section>
 
-      {d.availabilitySource === 'ESTIMATED' && (
-        <section className="inspector__section">
-          <h4>Redundancy (k-of-n identical units)</h4>
-          <div className="field-row">
-            <NumberField label="Units (n)" value={d.redundancyN} step={1} min={1} onChange={(v) => set({ redundancyN: Math.max(1, Math.round(v)) })} />
-            <NumberField label="Required (k)" value={d.redundancyK} step={1} min={1} onChange={(v) => set({ redundancyK: Math.max(1, Math.round(v)) })} />
+      <section className="inspector__section">
+        <h4>Redundancy (k-of-n identical units)</h4>
+        <div className="field-row">
+          <NumberField label="Units (n)" value={d.redundancyN} step={1} min={1} onChange={(v) => set({ redundancyN: Math.max(1, Math.round(v)) })} />
+          <NumberField label="Required (k)" value={d.redundancyK} step={1} min={1} onChange={(v) => set({ redundancyK: Math.max(1, Math.round(v)) })} />
+        </div>
+        <span className="field__hint">e.g. n=3, k=2 models a triple-redundant cooling skid that tolerates one failure. Works for warranted blocks too — n identical OEM-warranted units, k required.</span>
+
+        {d.subsystem === 'aggregated' && (
+          <div className="capacity-scaling">
+            <h5>Derive k from contracted capacity</h5>
+            <span className="field__hint">
+              Enter one physical block's own rating and the site's contracted capacity — the required
+              block count (k, above) is worked out for you, so n can stay higher than k and still show
+              100% availability to the trading desk as long as enough blocks are up.
+            </span>
+            <div className="field-row">
+              <NumberField label="Block power" suffix="MW" value={d.blockPowerMW} step={0.1} min={0} onChange={(v) => set({ blockPowerMW: v })} />
+              <NumberField label="Block energy" suffix="MWh" value={d.blockEnergyMWh} step={0.1} min={0} onChange={(v) => set({ blockEnergyMWh: v })} />
+            </div>
+            <div className="field-row">
+              <NumberField label="Contracted power" suffix="MW" value={d.contractedPowerMW} step={1} min={0} onChange={(v) => set({ contractedPowerMW: v })} />
+              <NumberField label="Contracted energy" suffix="MWh" value={d.contractedEnergyMWh} step={1} min={0} onChange={(v) => set({ contractedEnergyMWh: v })} />
+            </div>
+
+            {sizing && (
+              <div className="capacity-summary">
+                <div>
+                  <span className="muted">Nameplate ({d.redundancyN} blocks)</span>
+                  <strong>{sizing.nameplatePowerMW.toFixed(1)} MW / {sizing.nameplateEnergyMWh.toFixed(1)} MWh</strong>
+                </div>
+                <div>
+                  <span className="muted">Required for contract</span>
+                  <strong>{sizing.requiredBlocks} of {d.redundancyN} blocks</strong>
+                </div>
+                <div>
+                  <span className="muted">Spare margin</span>
+                  <strong>{sizing.marginPct >= 0 ? '+' : ''}{sizing.marginPct.toFixed(0)}%</strong>
+                </div>
+                {sizing.requiredBlocks !== d.redundancyK && (
+                  <button className="btn btn--ghost btn--sm" onClick={() => set({ redundancyK: sizing.requiredBlocks })}>
+                    Use {sizing.requiredBlocks} as required (k)
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-          <span className="field__hint">e.g. n=3, k=2 models a triple-redundant cooling skid that tolerates one failure.</span>
-        </section>
-      )}
+        )}
+      </section>
 
       <section className="inspector__section">
         <h4>Network role</h4>
