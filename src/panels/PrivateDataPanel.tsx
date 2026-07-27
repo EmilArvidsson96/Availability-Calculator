@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useGraphStore } from '../store/useGraphStore';
 import { useSyncConfigStore, toSyncConfig } from '../lib/useSyncConfigStore';
-import { listProjects, loadProject, saveProject, type RemoteProjectFile } from '../lib/githubSync';
+import {
+  listProjects,
+  loadProject,
+  saveProject,
+  runDiagnostics,
+  type RemoteProjectFile,
+  type DiagnosticStep,
+} from '../lib/githubSync';
 
 export function PrivateDataPanel({ onClose }: { onClose: () => void }) {
   const owner = useSyncConfigStore((s) => s.owner);
@@ -19,17 +26,31 @@ export function PrivateDataPanel({ onClose }: { onClose: () => void }) {
   const [filename, setFilename] = useState('project.json');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticStep[] | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+
+  const runDiag = async () => {
+    if (!token) return;
+    setDiagnosing(true);
+    try {
+      setDiagnostics(await runDiagnostics(cfg));
+    } finally {
+      setDiagnosing(false);
+    }
+  };
 
   const refresh = async () => {
     if (!configReady) return;
     setBusy(true);
     setStatus(null);
+    setDiagnostics(null);
     try {
       const list = await listProjects(cfg);
       setFiles(list);
       if (list.length === 0) setStatus({ kind: 'info', text: 'No project files found in projects/ yet.' });
     } catch (err) {
       setStatus({ kind: 'error', text: err instanceof Error ? err.message : String(err) });
+      await runDiag();
     } finally {
       setBusy(false);
     }
@@ -45,12 +66,14 @@ export function PrivateDataPanel({ onClose }: { onClose: () => void }) {
   const doLoad = async (path: string) => {
     setBusy(true);
     setStatus(null);
+    setDiagnostics(null);
     try {
       const json = await loadProject(cfg, path);
       importJson(json);
       setStatus({ kind: 'info', text: `Loaded ${path}.` });
     } catch (err) {
       setStatus({ kind: 'error', text: err instanceof Error ? err.message : String(err) });
+      await runDiag();
     } finally {
       setBusy(false);
     }
@@ -59,12 +82,14 @@ export function PrivateDataPanel({ onClose }: { onClose: () => void }) {
   const doSave = async () => {
     setBusy(true);
     setStatus(null);
+    setDiagnostics(null);
     try {
       await saveProject(cfg, filename, exportJson());
       setStatus({ kind: 'info', text: `Saved to ${owner}/${repo}.` });
       await refresh();
     } catch (err) {
       setStatus({ kind: 'error', text: err instanceof Error ? err.message : String(err) });
+      await runDiag();
     } finally {
       setBusy(false);
     }
@@ -112,8 +137,31 @@ export function PrivateDataPanel({ onClose }: { onClose: () => void }) {
         </div>
         <p className="field__hint">
           Use a fine-grained token scoped to only this repo (Contents: Read and write) — create one at
-          github.com → Settings → Developer settings → Personal access tokens.
+          github.com → Settings → Developer settings → Personal access tokens. The repo needs at least
+          one commit (e.g. created with a README) so its default branch exists.
         </p>
+
+        <div className="modal__section">
+          <div className="modal__section-head">
+            <h4>Connection diagnostics</h4>
+            <button className="btn btn--ghost" disabled={!token || diagnosing} onClick={runDiag}>
+              {diagnosing ? 'Checking…' : 'Run diagnostics'}
+            </button>
+          </div>
+          {diagnostics && (
+            <ul className="diaglist">
+              {diagnostics.map((d) => (
+                <li key={d.name} className={d.ok ? 'diaglist__ok' : 'diaglist__fail'}>
+                  <span className="diaglist__icon">{d.ok ? '✓' : '✗'}</span>
+                  <div>
+                    <strong>{d.name}</strong>
+                    <p>{d.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {status && (
           <div className={`alert ${status.kind === 'error' ? 'alert--error' : 'alert--warn'}`}>{status.text}</div>

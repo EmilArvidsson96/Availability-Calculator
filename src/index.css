@@ -193,6 +193,17 @@ h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing
   border-radius: 7px; font-size: 12px; }
 .synclist li:nth-child(odd) { background: #f8fafc; }
 
+.diaglist { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px;
+  max-height: 220px; overflow-y: auto; }
+.diaglist li { display: flex; gap: 8px; padding: 7px 9px; border-radius: 8px; font-size: 11.5px; }
+.diaglist li strong { display: block; font-size: 11.5px; }
+.diaglist li p { margin: 2px 0 0; color: var(--muted); line-height: 1.4; }
+.diaglist__icon { font-weight: 800; width: 12px; flex-shrink: 0; }
+.diaglist__ok { background: #f0fdf4; }
+.diaglist__ok .diaglist__icon { color: #16a34a; }
+.diaglist__fail { background: #fef2f2; }
+.diaglist__fail .diaglist__icon { color: #b91c1c; }
+
 /* ---- External events ---- */
 .external__head { margin-bottom: 10px; }
 .external__table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
