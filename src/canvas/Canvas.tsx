@@ -71,7 +71,11 @@ export function Canvas() {
   );
 
   const onSelectionChange = useCallback<OnSelectionChangeFunc>(
-    ({ nodes: selected }) => setSelected(selected.length === 1 ? selected[0].id : null),
+    ({ nodes: selNodes, edges: selEdges }) => {
+      if (selNodes.length === 1 && selEdges.length === 0) setSelected(selNodes[0].id);
+      else if (selEdges.length === 1 && selNodes.length === 0) setSelected(selEdges[0].id);
+      else setSelected(null);
+    },
     [setSelected],
   );
 

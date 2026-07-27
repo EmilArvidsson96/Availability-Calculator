@@ -274,13 +274,16 @@ const SINK = -2;
 /**
  * Compile a layer's topology into an evaluation tree.
  * @param n           number of components (probability indices 0..n-1)
- * @param edges       connections on this layer, as [i, j] component-index pairs
+ * @param edges       connections on this layer, as [i, j] component-index pairs,
+ *                    with an optional third element giving that connection's own
+ *                    reliability (a `var` referencing a probability beyond index
+ *                    n-1); omitted means the connection is perfect.
  * @param sourceIdxs  components joined to the virtual super-source
  * @param sinkIdxs    components joined to the virtual sink (delivery point)
  */
 export function compileNetwork(
   n: number,
-  edges: Array<[number, number]>,
+  edges: Array<[number, number, RelTree?]>,
   sourceIdxs: number[],
   sinkIdxs: number[],
 ): CompiledNetwork {
@@ -295,7 +298,7 @@ export function compileNetwork(
     addVertex(g, SOURCE);
     addVertex(g, SINK);
     for (let i = 0; i < n; i++) addVertex(g, i);
-    for (const [a, b] of edges) addEdge(g, a, b, ONE);
+    for (const [a, b, tree] of edges) addEdge(g, a, b, tree ?? ONE);
     for (const s of sourceIdxs) addEdge(g, SOURCE, s, ONE);
     for (const t of sinkIdxs) addEdge(g, t, SINK, ONE);
     return g;

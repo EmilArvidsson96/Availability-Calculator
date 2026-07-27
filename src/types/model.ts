@@ -147,3 +147,28 @@ export const DEFAULT_SOFTWARE: SoftwareLayer = {
   mttrRebootHours: 1,
   plannedPatchHoursPerYear: 4,
 };
+
+/**
+ * Optional reliability model for a connection (edge). By default a connection
+ * is treated as perfect — only components fail. Enable this for a link that
+ * can genuinely fail on its own (a grid interconnection, a WAN/telecom
+ * circuit, a comms channel), with a grace window ("hours without impact")
+ * during which the system rides through the outage — via local buffering, a
+ * backup path, or manual failover — before it counts against availability.
+ */
+export interface ConnectionReliability {
+  enabled: boolean;
+  /** Mean time between failures, hours. */
+  mtbfHours: number;
+  /** Mean time to repair/restore the connection, hours. */
+  mttrHours: number;
+  /** Hours the system can ride through a failure before it has any impact. */
+  impactWindowHours: number;
+}
+
+export const DEFAULT_CONNECTION_RELIABILITY: ConnectionReliability = {
+  enabled: false,
+  mtbfHours: 8760,
+  mttrHours: 4,
+  impactWindowHours: 0,
+};

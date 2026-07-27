@@ -6,8 +6,9 @@ import {
   kOfNAvailability,
   softwareUnavailability,
   mtbfLowerBound,
+  connectionAvailability,
 } from './availability';
-import type { SoftwareLayer } from '../types/model';
+import type { ConnectionReliability, SoftwareLayer } from '../types/model';
 
 describe('elementary availability', () => {
   it('single repairable unit', () => {
@@ -59,6 +60,28 @@ describe('software layer', () => {
     };
     const highCoverage = { ...base, watchdogCoverage: 0.95 };
     expect(softwareUnavailability(highCoverage)).toBeLessThan(softwareUnavailability(base));
+  });
+});
+
+describe('connection availability (grace window)', () => {
+  it('a disabled connection is treated as perfect', () => {
+    const r: ConnectionReliability = { enabled: false, mtbfHours: 100, mttrHours: 10, impactWindowHours: 0 };
+    expect(connectionAvailability(r)).toBe(1);
+  });
+
+  it('with no grace window, matches plain MTBF/MTTR availability', () => {
+    const r: ConnectionReliability = { enabled: true, mtbfHours: 4000, mttrHours: 8, impactWindowHours: 0 };
+    expect(connectionAvailability(r)).toBeCloseTo(pointAvailability(4000, 8), 12);
+  });
+
+  it('only the repair time beyond the window counts as downtime', () => {
+    const r: ConnectionReliability = { enabled: true, mtbfHours: 4000, mttrHours: 8, impactWindowHours: 2 };
+    expect(connectionAvailability(r)).toBeCloseTo(pointAvailability(4000, 6), 12);
+  });
+
+  it('a grace window covering the whole repair makes the connection effectively perfect', () => {
+    const r: ConnectionReliability = { enabled: true, mtbfHours: 4000, mttrHours: 4, impactWindowHours: 8 };
+    expect(connectionAvailability(r)).toBe(1);
   });
 });
 

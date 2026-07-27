@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { chi2Inv } from './distributions';
-import type { ComponentData, SoftwareLayer } from '../types/model';
+import type { ComponentData, ConnectionReliability, SoftwareLayer } from '../types/model';
 
 const HOURS_PER_YEAR = 8760;
 
@@ -119,6 +119,18 @@ export function componentAvailabilityLowerBound(d: ComponentData, confidence: nu
   const mttrU = d.mttrHours * Math.exp(d.mttrLogSigma);
   const base = applyRedundancy(pointAvailability(mtbfL, mttrU), d);
   return base * (1 - softwareUnavailability(d.software));
+}
+
+/**
+ * Effective steady-state availability of a connection (edge) that can fail on
+ * its own. Downtime only accrues for the portion of a repair beyond the
+ * impact window the system can ride through unaffected — a failure shorter
+ * than the window has no effect on availability.
+ */
+export function connectionAvailability(r: ConnectionReliability): number {
+  if (!r.enabled) return 1;
+  const effectiveMttr = Math.max(0, r.mttrHours - r.impactWindowHours);
+  return pointAvailability(r.mtbfHours, effectiveMttr);
 }
 
 export function clamp01(x: number): number {

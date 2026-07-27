@@ -19,7 +19,7 @@ import {
 } from '../types/model';
 import { instantiateAny } from './useCatalogStore';
 import { buildExample, type CompNode } from '../data/example';
-import { makeEdge, edgeStyleFor, getLayer } from '../lib/edges';
+import { makeEdge, edgeStyleFor, getLayer, getReliability, type EdgeData } from '../lib/edges';
 import {
   evaluatePoint,
   type ScenarioInput,
@@ -64,6 +64,8 @@ interface GraphState {
   onConnect: (c: Connection) => void;
   addComponent: (kind: string, position: XYPosition) => void;
   updateNodeData: (id: string, patch: Partial<ComponentData>) => void;
+  updateEdgeData: (id: string, patch: Partial<EdgeData>) => void;
+  deleteEdge: (id: string) => void;
   deleteSelected: () => void;
   copySelection: () => void;
   pasteClipboard: () => void;
@@ -86,7 +88,13 @@ interface GraphState {
 function scenarioInput(state: Pick<GraphState, 'nodes' | 'edges' | 'externalEvents'>): ScenarioInput {
   return {
     components: state.nodes.map((n) => ({ id: n.id, data: n.data })),
-    edges: state.edges.map((e) => ({ source: e.source, target: e.target, layer: getLayer(e) })),
+    edges: state.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      layer: getLayer(e),
+      reliability: getReliability(e),
+    })),
     externalEvents: state.externalEvents,
   };
 }
@@ -202,6 +210,25 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   updateNodeData: (id, patch) => {
     set({
       nodes: get().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
+    });
+    get().recompute();
+    persist(get());
+  },
+
+  updateEdgeData: (id, patch) => {
+    set({
+      edges: get().edges.map((e) =>
+        e.id === id ? { ...e, data: { ...(e.data as EdgeData), ...patch } } : e,
+      ),
+    });
+    get().recompute();
+    persist(get());
+  },
+
+  deleteEdge: (id) => {
+    set({
+      edges: get().edges.filter((e) => e.id !== id),
+      selectedId: get().selectedId === id ? null : get().selectedId,
     });
     get().recompute();
     persist(get());
