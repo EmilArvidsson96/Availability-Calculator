@@ -9,8 +9,14 @@
 
 export const SCHEMA_VERSION = 1;
 
-/** The six subsystem groups, in cell -> grid -> digital order. */
+/**
+ * The subsystem groups. `aggregated` holds block-level shortcuts (DC block, AC
+ * block, BESS block, ...) that stand in for a whole cluster of the granular
+ * cell -> grid -> digital groups below; use them to sketch a site fast, then
+ * swap in the granular components where you need a detailed teardown.
+ */
 export type Subsystem =
+  | 'aggregated'
   | 'battery'
   | 'power-conversion'
   | 'mv-grid'

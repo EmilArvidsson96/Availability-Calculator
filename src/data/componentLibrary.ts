@@ -20,6 +20,7 @@ export interface SubsystemMeta {
 }
 
 export const SUBSYSTEMS: SubsystemMeta[] = [
+  { key: 'aggregated', label: 'Aggregated Blocks', color: '#f59e0b' },
   { key: 'battery', label: 'Battery', color: '#16a34a' },
   { key: 'power-conversion', label: 'Power Conversion', color: '#ea580c' },
   { key: 'mv-grid', label: 'MV / Grid', color: '#2563eb' },
@@ -69,6 +70,51 @@ function base(): ComponentData {
 }
 
 export const CATALOG: ComponentTemplate[] = [
+  // --- Aggregated Blocks -----------------------------------------------------
+  // Shortcuts that stand in for a whole cluster of granular components below —
+  // use these to sketch a site fast as N parallel blocks feeding a shared
+  // MV/transformer/grid chain, instead of wiring every rack and combiner by hand.
+  {
+    kind: 'dc-block',
+    label: 'DC Block',
+    subsystem: 'aggregated',
+    icon: '🗄️',
+    hint: 'Aggregated DC side of one block — racks + rack BMS + DC combiner as a single unit. Add one per physical block/container and wire in parallel with its siblings into a shared AC block or PCS.',
+    overrides: {
+      mtbfHours: 150000,
+      mttrHours: 24,
+      effectiveFailures: 8,
+      isElectricalSource: true,
+      spof: true,
+    },
+  },
+  {
+    kind: 'ac-block',
+    label: 'AC Block',
+    subsystem: 'aggregated',
+    icon: '🔁',
+    hint: 'Aggregated AC side of one block — PCS + LV switchgear as a single unit converting a DC block’s output. Add one per block, downstream of its DC block(s).',
+    overrides: {
+      mtbfHours: 60000,
+      mttrHours: 12,
+      effectiveFailures: 8,
+      spof: true,
+    },
+  },
+  {
+    kind: 'bess-block',
+    label: 'BESS Block (DC+AC)',
+    subsystem: 'aggregated',
+    icon: '📦',
+    hint: 'Fully integrated containerized block — battery + PCS + thermal management as one OEM-warranted unit. The fastest way to model a site: one node per physical block, wired in parallel, feeding a shared transformer/MV/grid chain.',
+    overrides: {
+      availabilitySource: 'WARRANTED',
+      warrantedAvailability: 0.97,
+      isElectricalSource: true,
+      spof: true,
+    },
+  },
+
   // --- Battery -------------------------------------------------------------
   {
     kind: 'battery-rack',
@@ -276,11 +322,9 @@ export function templateFor(kind: string): ComponentTemplate | undefined {
   return CATALOG_BY_KIND.get(kind);
 }
 
-/** Build a fresh ComponentData for a palette kind. */
-export function instantiate(kind: string): ComponentData {
-  const t = CATALOG_BY_KIND.get(kind);
+/** Build a fresh ComponentData from any template (built-in or user-created). */
+export function instantiateTemplate(t: ComponentTemplate): ComponentData {
   const d = base();
-  if (!t) return d;
   return {
     ...d,
     ...t.overrides,
@@ -289,4 +333,10 @@ export function instantiate(kind: string): ComponentData {
     subsystem: t.subsystem,
     software: { ...(t.overrides.software ?? d.software) },
   };
+}
+
+/** Build a fresh ComponentData for a built-in catalog kind. */
+export function instantiate(kind: string): ComponentData {
+  const t = CATALOG_BY_KIND.get(kind);
+  return t ? instantiateTemplate(t) : base();
 }

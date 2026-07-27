@@ -3,7 +3,8 @@ import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ComponentData } from '../types/model';
 import type { CompNode } from '../data/example';
 import { useGraphStore } from '../store/useGraphStore';
-import { SUBSYSTEM_COLOR, templateFor } from '../data/componentLibrary';
+import { SUBSYSTEM_COLOR } from '../data/componentLibrary';
+import { resolveTemplate } from '../store/useCatalogStore';
 import { availabilityColor, formatPercent } from '../lib/format';
 
 const SOURCE_BADGE: Record<ComponentData['availabilitySource'], string> = {
@@ -16,7 +17,7 @@ function ComponentNodeImpl({ id, data, selected }: NodeProps<CompNode>) {
   const d: ComponentData = data;
   const result = useGraphStore((s) => s.componentResults[id]);
   const accent = SUBSYSTEM_COLOR[d.subsystem];
-  const icon = templateFor(d.kind)?.icon ?? '⬛';
+  const icon = resolveTemplate(d.kind)?.icon ?? '⬛';
   const availability = result?.availability;
   const critical = result?.critical;
 
@@ -26,7 +27,7 @@ function ComponentNodeImpl({ id, data, selected }: NodeProps<CompNode>) {
     <div
       className={`node ${selected ? 'node--selected' : ''} ${critical ? 'node--critical' : ''}`}
       style={{ borderLeftColor: accent }}
-      title={templateFor(d.kind)?.hint}
+      title={resolveTemplate(d.kind)?.hint}
     >
       <Handle type="source" position={Position.Left} id="l" style={handleStyle} />
       <Handle type="source" position={Position.Right} id="r" style={handleStyle} />

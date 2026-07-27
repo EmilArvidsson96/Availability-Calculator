@@ -17,7 +17,7 @@ import {
   DEFAULT_SIM_SETTINGS,
   SCHEMA_VERSION,
 } from '../types/model';
-import { instantiate } from '../data/componentLibrary';
+import { instantiateAny } from './useCatalogStore';
 import { buildExample, type CompNode } from '../data/example';
 import { makeEdge, edgeStyleFor, getLayer } from '../lib/edges';
 import {
@@ -189,7 +189,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   addComponent: (kind, position) => {
     const id = `${kind}_${Date.now()}_${Math.floor(position.x)}`;
-    const node: CompNode = { id, type: 'component', position, data: instantiate(kind) };
+    const node: CompNode = { id, type: 'component', position, data: instantiateAny(kind) };
     set({ nodes: [...get().nodes, node], selectedId: id });
     get().recompute();
     persist(get());

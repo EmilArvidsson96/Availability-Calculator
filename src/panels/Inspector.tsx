@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useGraphStore } from '../store/useGraphStore';
 import type { AvailabilitySource, ComponentData, ControlMode } from '../types/model';
 import { componentPointAvailability, componentAvailabilityLowerBound } from '../engine/availability';
 import { formatPercent, downtimePerYear } from '../lib/format';
 import { SUBSYSTEM_LABEL } from '../data/componentLibrary';
+import { NewComponentModal } from '../canvas/NewComponentModal';
 
 function NumberField(props: {
   label: string;
@@ -49,6 +51,7 @@ export function Inspector() {
   const update = useGraphStore((s) => s.updateNodeData);
   const remove = useGraphStore((s) => s.deleteSelected);
   const confidence = useGraphStore((s) => s.simSettings.confidence);
+  const [showSaveAs, setShowSaveAs] = useState(false);
 
   if (!node) {
     return (
@@ -191,9 +194,19 @@ export function Inspector() {
         )}
       </section>
 
+      <button className="btn btn--ghost" onClick={() => setShowSaveAs(true)}>
+        Save as new palette item…
+      </button>
       <button className="btn btn--danger" onClick={remove}>
         Delete component
       </button>
+
+      {showSaveAs && (
+        <NewComponentModal
+          onClose={() => setShowSaveAs(false)}
+          seed={{ label: `${d.label} (custom)`, subsystem: d.subsystem, data: d }}
+        />
+      )}
     </div>
   );
 }
