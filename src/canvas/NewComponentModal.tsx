@@ -182,21 +182,20 @@ export function NewComponentModal({ onClose, seed }: { onClose: () => void; seed
           )}
         </section>
 
-        {form.availabilitySource === 'ESTIMATED' && (
-          <section className="inspector__section">
-            <h4>Redundancy (k-of-n identical units)</h4>
-            <div className="field-row">
-              <div className="field">
-                <span className="field__label">Units (n)</span>
-                <input type="number" value={form.redundancyN} min={1} step={1} onChange={(e) => set({ redundancyN: parseFloat(e.target.value) })} />
-              </div>
-              <div className="field">
-                <span className="field__label">Required (k)</span>
-                <input type="number" value={form.redundancyK} min={1} step={1} onChange={(e) => set({ redundancyK: parseFloat(e.target.value) })} />
-              </div>
+        <section className="inspector__section">
+          <h4>Redundancy (k-of-n identical units)</h4>
+          <div className="field-row">
+            <div className="field">
+              <span className="field__label">Units (n)</span>
+              <input type="number" value={form.redundancyN} min={1} step={1} onChange={(e) => set({ redundancyN: parseFloat(e.target.value) })} />
             </div>
-          </section>
-        )}
+            <div className="field">
+              <span className="field__label">Required (k)</span>
+              <input type="number" value={form.redundancyK} min={1} step={1} onChange={(e) => set({ redundancyK: parseFloat(e.target.value) })} />
+            </div>
+          </div>
+          <span className="field__hint">Block-level MW/MWh capacity sizing can be fine-tuned per instance from the Inspector after dropping it (Aggregated Blocks group).</span>
+        </section>
 
         <section className="inspector__section">
           <h4>Network role</h4>

@@ -90,6 +90,17 @@ export interface ComponentData {
   redundancyN: number;
   redundancyK: number;
 
+  /**
+   * Optional capacity-based sizing, for blocks where N/k should be derived from a
+   * contracted MW/MWh target instead of guessed directly (typical for BESS blocks
+   * warranted per-unit by the OEM). Leave at 0 to ignore and set redundancyK by hand,
+   * exactly like the plain k-of-n redundancy used for control equipment.
+   */
+  blockPowerMW: number;
+  blockEnergyMWh: number;
+  contractedPowerMW: number;
+  contractedEnergyMWh: number;
+
   // Roles in the reliability network
   isElectricalSource: boolean;
   isDeliverySink: boolean;

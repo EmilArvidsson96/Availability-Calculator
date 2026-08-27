@@ -28,9 +28,24 @@ Web Worker so the heavy computation happens locally.
 - **Estimated** components: `A = MTBF / (MTBF + MTTR)`. Node-level `k-of-n` redundancy is applied
   for blocks that represent several identical parallel units.
 - **Warranted** components: the guaranteed availability `%` is used directly as a fixed lower bound
-  (no estimation noise — the risk is contractually transferred to the supplier).
+  (no estimation noise — the risk is contractually transferred to the supplier). `k-of-n` redundancy
+  applies here too, on top of the per-unit warranty.
 - **SLA** components (cloud/telco): the SLA `%` with an optional *adjustment* derate for the
   exclusions every SLA carries (throttling, maintenance windows, correlated outages).
+
+### BESS block capacity scaling
+The **BESS Block (DC+AC)** template (and any other node in the *Aggregated Blocks* group) can model
+a whole array of identical warranted blocks as one node: **Units (n)** is how many physical blocks are
+built, **Required (k)** is how many must be up to deliver the contracted capacity — the same `k-of-n`
+maths used for control equipment (String PCS, HVAC N+1, ...), just applied to a warranted block instead
+of an estimated one.
+
+Rather than guessing k, fill in each block's own **power (MW)** / **energy (MWh)** rating and the
+site's **contracted power/energy** — the inspector derives the required block count and shows the
+nameplate total and spare margin (e.g. 10 blocks built at 5 MW/10 MWh each against a 40 MW/80 MWh
+contract needs only 8 of the 10 up, a 25% margin). Building more blocks than the contract requires lets
+the site keep showing 100% availability to the trading desk while individual blocks are down for
+maintenance or repair.
 - An optional **software layer** adds `U_sw = λ·[c·MTTR_auto + (1−c)·MTTR_reboot] + planned-patch`,
   where `c` is the watchdog/auto-recovery coverage.
 
